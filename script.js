@@ -93,6 +93,12 @@ function processQuestions(rows) {
     const key = `${q.question}_${q.author}`;
     prevQuestionMap.set(key, q);
   });
+
+  // Keep track of removed questions
+  const removedQuestions = new Set();
+  questionsData.forEach(q => {
+    if (q.removed) removedQuestions.add(getQuestionKey(q));
+  });
   
   // Process the current data from the sheet
   const newQuestionsData = rows.slice(1).map((row, i) => {
@@ -103,6 +109,9 @@ function processQuestions(rows) {
     const key = `${question}_${author}`;
     const existing = prevQuestionMap.get(key);
     
+    // Preserve removed status
+    const isRemoved = removedQuestions.has(key);
+    
     return {
       id: i,
       question,
@@ -110,9 +119,10 @@ function processQuestions(rows) {
       timestamp,
       votes: existing ? existing.votes : 0,
       answered: existing ? existing.answered : false,
-      isNew: !existing && prevQuestionMap.size > 0 // Mark as new if not in previous data
+      isNew: !existing && prevQuestionMap.size > 0, // Mark as new if not in previous data
+      removed: isRemoved || (existing ? existing.removed : false)
     };
-  }).filter(q => q.question);
+  }).filter(q => q.question && !q.removed); // Don't include removed questions
   
   // Check if we have new entries
   const newEntries = newQuestionsData.filter(q => q.isNew);
@@ -131,61 +141,75 @@ function getQuestionKey(question) {
   return `${question.question}_${question.author}`;
 }
 
+// Updated renderQuestions function to improve the question banners
 function renderQuestions() {
-    if (questionsData.length === 0) {
-      questionsList.innerHTML = '<div class="no-questions">No questions found</div>';
-      return;
-    }
-  
-    const sortMethod = document.getElementById('sort-method').value;
-    const sorted = [...questionsData];
-  
-    if (sortMethod === 'newest') {
-      sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    } else if (sortMethod === 'votes') {
-      sorted.sort((a, b) => b.votes - a.votes);
-    }
-    
-    // Create HTML for all questions
-    questionsList.innerHTML = sorted.map(q => {
-      const time = new Date(q.timestamp);
-      return `
-        <div class="question ${q.answered ? 'answered' : ''} ${q.isNew ? 'new-entry' : ''}" data-id="${q.id}" 
-             style="${q.isNew ? 'opacity: 0; transform: translateY(-20px);' : ''}">
-          <div class="question-text">${escapeHtml(q.question)}</div>
-          <div class="question-meta">
-            <span class="question-author">${escapeHtml(q.author)}</span>
-            ${q.isNew ? '<span class="new-badge">NEW</span>' : ''}
-          </div>
-          <div class="admin-actions">
-            <button class="admin-btn" onclick="toggleAnswered(${q.id})">
-              ${q.answered ? 'Answered' : 'Unanswered'}
-            </button>
-            <div class="question-time">${time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-          </div>
-        </div>
-      `;
-    }).join('');
-    
-    // Apply animations after a short delay to ensure the DOM has updated
-    setTimeout(() => {
-      const newQuestionElements = document.querySelectorAll('.new-entry');
-      newQuestionElements.forEach(el => {
-        // Trigger animation through style changes
-        el.style.transition = 'transform 0.5s ease-out, opacity 0.5s ease-out';
-        el.style.opacity = '1';
-        el.style.transform = 'translateY(0)';
-      });
-      
-      // Clear the "new" status after animation completes
-      setTimeout(() => {
-        questionsData.forEach(q => {
-          if (q.isNew) q.isNew = false;
-        });
-      }, 2000);
-    }, 50);
-}
+  if (questionsData.length === 0) {
+    questionsList.innerHTML = '<div class="no-questions">No questions found. Questions will appear here when submitted.</div>';
+    return;
+  }
 
+  const sortMethod = document.getElementById('sort-method').value;
+  const sorted = [...questionsData];
+
+  // First sort by the selected method
+  if (sortMethod === 'newest') {
+    sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  } else if (sortMethod === 'votes') {
+    sorted.sort((a, b) => b.votes - a.votes);
+  }
+  
+  // Then move answered questions to the bottom
+  sorted.sort((a, b) => {
+    if (a.answered && !b.answered) return 1;
+    if (!a.answered && b.answered) return -1;
+    return 0;
+  });
+  
+  // Create HTML for all questions with improved layout
+  questionsList.innerHTML = sorted.map(q => {
+    const time = new Date(q.timestamp);
+    const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const formattedDate = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    
+    return `
+      <div class="question ${q.answered ? 'answered' : ''} ${q.isNew ? 'new-entry' : ''}" data-id="${q.id}" 
+           style="${q.isNew ? 'opacity: 0; transform: translateY(-20px);' : ''}">
+        <div class="question-text">${escapeHtml(q.question)}</div>
+        <div class="question-meta">
+          <span class="question-author">${escapeHtml(q.author)}</span>
+          ${q.isNew ? '<span class="new-badge">New</span>' : ''}
+          <span class="question-time">${formattedDate} at ${formattedTime}</span>
+        </div>
+        <div class="admin-actions">
+          <button class="admin-btn tick-btn" onclick="toggleAnswered(${q.id})" title="${q.answered ? 'Mark as unanswered' : 'Mark as answered'}">
+            ✓
+          </button>
+          <button class="admin-btn remove-btn" onclick="removeQuestion(${q.id})" title="Remove inappropriate question">
+            ✕
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  // Apply animations after a short delay to ensure the DOM has updated
+  setTimeout(() => {
+    const newQuestionElements = document.querySelectorAll('.new-entry');
+    newQuestionElements.forEach(el => {
+      // Trigger animation through style changes
+      el.style.transition = 'transform 0.5s ease-out, opacity 0.5s ease-out';
+      el.style.opacity = '1';
+      el.style.transform = 'translateY(0)';
+    });
+    
+    // Clear the "new" status after animation completes
+    setTimeout(() => {
+      questionsData.forEach(q => {
+        if (q.isNew) q.isNew = false;
+      });
+    }, 2000);
+  }, 50);
+}
 
 function updateStatus(msg, type) {
   statusEl.textContent = msg;
@@ -202,6 +226,16 @@ function toggleAnswered(id) {
   const q = questionsData.find(q => q.id === id);
   if (q) q.answered = !q.answered;
   renderQuestions();
+}
+
+function removeQuestion(id) {
+  const q = questionsData.find(q => q.id === id);
+  if (q) {
+    q.removed = true;
+    questionsData = questionsData.filter(question => !question.removed);
+    renderQuestions();
+    updateStatus('Question removed', 'connected');
+  }
 }
 
 function escapeHtml(text) {
