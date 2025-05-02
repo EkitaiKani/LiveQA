@@ -6,7 +6,6 @@
   <title>Live Q&A Platform</title>
 
   <link rel="stylesheet" href="style.css" type="text/css">
-  <script src="https://kit.fontawesome.com/12afc8429e.js" crossorigin="anonymous"></script>
 
 </head>
 <body>
@@ -24,6 +23,10 @@
             <input type="text" id="sheet-id" placeholder="Enter your Google Sheet ID">
           </div>
           <div>
+            <label for="sheet-tab">Sheet Tab Name:</label>
+            <input type="text" id="sheet-tab" placeholder="Form Responses 1">
+          </div>
+          <div>
             <label for="refresh-rate">Refresh Rate (seconds):</label>
             <input type="number" id="refresh-rate" value="5" min="5">
           </div>
@@ -34,10 +37,14 @@
             <input type="text" id="question-column" placeholder="Your question">
           </div>
           <div>
+            <label for="name-column">Name Column Name:</label>
+            <input type="text" id="name-column" placeholder="Your name">
+          </div>
+          <div>
             <label for="sort-method">Sort Questions By:</label>
             <select id="sort-method">
               <option value="newest">Newest First</option>
-              <option value="oldest">Oldest First</option>
+              <option value="votes">Most Votes</option>
             </select>
           </div>
         </div>

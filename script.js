@@ -3,7 +3,7 @@ let previousQuestionCount = 0;  // Track previous number of questions
 let refreshInterval;
 let isConnected = false;
 
-const apiKey = 'AIzaSyA6wivKowta0v1Eyf56ZsUdIYQXK36_XvY'; // Replace this with your real API key
+const apiKey = 'YOUR-API-KEY'; // Replace this with your real API key
 
 const connectBtn = document.getElementById('connect-btn');
 const statusEl = document.getElementById('status');
