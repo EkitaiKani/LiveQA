@@ -55,27 +55,8 @@ Hi hi hiiii this is my website thingy that shows questions from that Google thin
 | What it is | What it do | What it normally is |
 |------------|------------|---------------------|
 | Google Sheet ID | Your magic paper's secret code | Required!! |
-| Sheet Tab Name | The tab thingy | "Form Responses 1" |
 | Refresh Rate | How fast it peeks for new questions | 5 |
 | Question Column Name | What your form calls the question | "Your question" |
-| Name Column Name | What your form calls the name | "Your name" |
-
-## 🎨 You Wanna Change How It Looks?
-
-Mess with `style.css` like a true hacker. Here's what you can touch:
-
-- `.question` = each little question box
-- `.new-entry` = for fancy new ones
-- `.answered` = for the ones you already dealt with like a boss
-- `.new-badge` = that “NEW!!!” thing
-
-## 🧪 Advanced Ninja Zone (you can ignore this lol)
-
-In `script.js` you can:
-- Make the questions dance or fly or something
-- Add extra info to questions like emojis or smells
-- Make more sorting stuff
-- Add login if you're scared of strangers (but I didn’t)
 
 ## 🕸 It Works On Stuff Like:
 
