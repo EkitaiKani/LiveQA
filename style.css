@@ -132,18 +132,18 @@ body {
       margin-bottom: 15px;
       border-radius: 4px;
       position: relative;
-      transition: opacity 0.5s ease, transform 0.5s ease;
+      transition: opacity 0.5s ease, transform 0.5s ease, margin 0.5s ease;
       opacity: 1;
       transform: translateY(0);
     }
 
+    .question.init-load {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
 .new-entry {
   border-left: 4px solid #4caf50;
-}
-
-.question {
-  /* Make sure there's a transition property available for our animation */
-  transition: transform 0.5s ease-out, opacity 0.5s ease-out;
 }
 
 .status.new-entries {

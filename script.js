@@ -136,39 +136,44 @@ function processQuestions(rows) {
 function getQuestionKey(question) {
   return `${question.question}_${question.timestamp}`;
 }
+let isFirstLoad = true;
 
-// Updated renderQuestions function to improve the question banners
+// Updated renderQuestions function with initial load animation
 function renderQuestions() {
   if (questionsData.length === 0) {
     questionsList.innerHTML = '<div class="no-questions">No questions found. Questions will appear here when submitted.</div>';
     return;
   }
-
+  
   const sortMethod = document.getElementById('sort-method').value;
   const sorted = [...questionsData];
-
+  
   // First sort by the selected method
   if (sortMethod === 'newest') {
     sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   } else if (sortMethod === 'oldest') {
     sorted.sort((b, a) => new Date(b.timestamp) - new Date(a.timestamp));
   }
-  
+ 
   // Then move answered questions to the bottom
   sorted.sort((a, b) => {
     if (a.answered && !b.answered) return 1;
     if (!a.answered && b.answered) return -1;
     return 0;
   });
-  
+ 
   // Create HTML for all questions with improved layout
-  questionsList.innerHTML = sorted.map(q => {
+  questionsList.innerHTML = sorted.map((q, index) => {
     const time = new Date(q.timestamp);
     const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const formattedDate = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
+   
+    // Add init-load class if this is the first time loading
+    const initialLoadClass = isFirstLoad ? 'init-load' : '';
     
     return `
-      <div class="question ${q.answered ? 'answered' : ''} ${q.isNew ? 'new-entry' : ''}" data-id="${q.id}" 
+      <div class="question ${q.answered ? 'answered' : ''} ${q.isNew ? 'new-entry' : ''} ${initialLoadClass}" 
+           data-id="${q.id}" data-index="${index}"
            style="${q.isNew ? 'opacity: 0; transform: translateY(-20px);' : ''}">
         <div class="question-text">${escapeHtml(q.question)}</div>
         <div class="question-meta">
@@ -181,9 +186,10 @@ function renderQuestions() {
       </div>
     `;
   }).join('');
-  
+ 
   // Apply animations after a short delay to ensure the DOM has updated
   setTimeout(() => {
+    // Handle new questions animation
     const newQuestionElements = document.querySelectorAll('.new-entry');
     newQuestionElements.forEach(el => {
       // Trigger animation through style changes
@@ -191,7 +197,28 @@ function renderQuestions() {
       el.style.opacity = '1';
       el.style.transform = 'translateY(0)';
     });
-    
+   
+    // Handle initial load animation with staggered effect
+    if (isFirstLoad) {
+      const allQuestions = document.querySelectorAll('.question.init-load');
+      allQuestions.forEach((el, i) => {
+        const delay = 50 + (i * 100); // Stagger the animations
+        setTimeout(() => {
+          el.style.transition = 'transform 0.5s ease-out, opacity 0.5s ease-out';
+          el.style.opacity = '1';
+          el.style.transform = 'translateY(0)';
+          
+          // Remove the init-load class after animation completes
+          setTimeout(() => {
+            el.classList.remove('init-load');
+          }, 500);
+        }, delay);
+      });
+      
+      // After all animations, mark first load as complete
+      isFirstLoad = false;
+    }
+   
     // Clear the "new" status after animation completes
     setTimeout(() => {
       questionsData.forEach(q => {
