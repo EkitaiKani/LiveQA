@@ -3,7 +3,7 @@ let previousQuestionCount = 0;  // Track previous number of questions
 let refreshInterval;
 let isConnected = false;
 
-const apiKey = 'YOUR-API-KEY'; // Replace this with your real API key
+const apiKey = 'AIzaSyA6wivKowta0v1Eyf56ZsUdIYQXK36_XvY'; // Replace this with your real API key
 
 const connectBtn = document.getElementById('connect-btn');
 const statusEl = document.getElementById('status');
@@ -24,7 +24,7 @@ document.getElementById('sort-method').addEventListener('change', renderQuestion
 
 function connectToSheet() {
   const sheetId = document.getElementById('sheet-id').value.trim();
-  const sheetTab = document.getElementById('sheet-tab').value.trim() || 'Form Responses 1';
+  const sheetTab = 'Form Responses 1';
 
   if (!sheetId) {
     updateStatus('Please enter a valid Google Sheet ID', 'error');
@@ -60,7 +60,7 @@ function fetchQuestions() {
   if (!isConnected) return;
 
   const sheetId = document.getElementById('sheet-id').value.trim();
-  const sheetTab = document.getElementById('sheet-tab').value.trim() || 'Form Responses 1';
+  const sheetTab = 'Form Responses 1';
   const apiUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(sheetTab)}?key=${apiKey}`;
 
   fetch(apiUrl)
@@ -74,12 +74,10 @@ function fetchQuestions() {
 
 function processQuestions(rows) {
   const questionColumn = document.getElementById('question-column').value.trim() || 'Your question';
-  const nameColumn = document.getElementById('name-column').value.trim() || 'Your name';
   const timestampColumn = 'Timestamp';
 
   const headers = rows[0];
   const questionIndex = headers.indexOf(questionColumn);
-  const nameIndex = headers.indexOf(nameColumn);
   const timestampIndex = headers.indexOf(timestampColumn);
 
   if (questionIndex === -1) {
@@ -90,7 +88,7 @@ function processQuestions(rows) {
   // Store the previous questions to compare with new data
   const prevQuestionMap = new Map();
   questionsData.forEach(q => {
-    const key = `${q.question}_${q.author}`;
+    const key = `${q.question}_${q.timestamp}`;
     prevQuestionMap.set(key, q);
   });
 
@@ -103,10 +101,9 @@ function processQuestions(rows) {
   // Process the current data from the sheet
   const newQuestionsData = rows.slice(1).map((row, i) => {
     const question = row[questionIndex] || '';
-    const author = row[nameIndex] || 'Anonymous';
     const timestamp = row[timestampIndex] || new Date().toISOString();
     
-    const key = `${question}_${author}`;
+    const key = `${question}_${timestamp}`;
     const existing = prevQuestionMap.get(key);
     
     // Preserve removed status
@@ -115,7 +112,6 @@ function processQuestions(rows) {
     return {
       id: i,
       question,
-      author,
       timestamp,
       votes: existing ? existing.votes : 0,
       answered: existing ? existing.answered : false,
@@ -138,7 +134,7 @@ function processQuestions(rows) {
 }
 
 function getQuestionKey(question) {
-  return `${question.question}_${question.author}`;
+  return `${question.question}_${question.timestamp}`;
 }
 
 // Updated renderQuestions function to improve the question banners
@@ -154,8 +150,8 @@ function renderQuestions() {
   // First sort by the selected method
   if (sortMethod === 'newest') {
     sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  } else if (sortMethod === 'votes') {
-    sorted.sort((a, b) => b.votes - a.votes);
+  } else if (sortMethod === 'oldest') {
+    sorted.sort((b, a) => new Date(b.timestamp) - new Date(a.timestamp));
   }
   
   // Then move answered questions to the bottom
@@ -176,17 +172,11 @@ function renderQuestions() {
            style="${q.isNew ? 'opacity: 0; transform: translateY(-20px);' : ''}">
         <div class="question-text">${escapeHtml(q.question)}</div>
         <div class="question-meta">
-          <span class="question-author">${escapeHtml(q.author)}</span>
           ${q.isNew ? '<span class="new-badge">New</span>' : ''}
           <span class="question-time">${formattedDate} at ${formattedTime}</span>
         </div>
         <div class="admin-actions">
-          <button class="admin-btn tick-btn" onclick="toggleAnswered(${q.id})" title="${q.answered ? 'Mark as unanswered' : 'Mark as answered'}">
-            ✓
-          </button>
-          <button class="admin-btn remove-btn" onclick="removeQuestion(${q.id})" title="Remove inappropriate question">
-            ✕
-          </button>
+          <i class="fa-solid fa-minus" onclick="toggleAnswered(${q.id})" title="${q.answered ? 'Mark as unanswered' : 'Mark as answered'}"></i>
         </div>
       </div>
     `;
@@ -222,10 +212,118 @@ function upvoteQuestion(id) {
   renderQuestions();
 }
 
+// Keep track of elements being animated
+let animatingElements = new Set();
+
+// Get the height of an element including margins
+function getElementHeight(el) {
+  const styles = window.getComputedStyle(el);
+  const marginTop = parseFloat(styles.marginTop);
+  const marginBottom = parseFloat(styles.marginBottom);
+  return el.offsetHeight + marginTop + marginBottom;
+}
+
+// Modified toggle function that adds animation
 function toggleAnswered(id) {
-  const q = questionsData.find(q => q.id === id);
-  if (q) q.answered = !q.answered;
-  renderQuestions();
+  // Find the element
+  const questionEl = document.querySelector(`.question[data-id="${id}"]`);
+  
+  // If element is already being animated, ignore the click
+  if (animatingElements.has(id)) return;
+  
+  // Mark this element as being animated
+  animatingElements.add(id);
+  
+  // Get element's height and position
+  const questionHeight = getElementHeight(questionEl);
+  const questionRect = questionEl.getBoundingClientRect();
+  
+  // Find all elements below this one that need to move up
+  const container = questionEl.closest('.questions-container');
+  const otherQuestions = Array.from(container.querySelectorAll('.question:not(.answered)'))
+    .filter(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.top > questionRect.top && el.getAttribute('data-id') != id;
+    });
+  
+  // Start animation process
+  if (!questionEl.classList.contains('answered')) {
+    // Animate other questions to move up
+    otherQuestions.forEach(el => {
+      // Add class for animation
+      el.classList.add('moving-up');
+      
+      // Store original transform to restore later
+      const originalTransform = window.getComputedStyle(el).transform;
+      el._originalTransform = originalTransform === 'none' ? '' : originalTransform;
+      
+      // Apply transform to move up by the height of the question being removed
+      el.style.transform = `translateY(-${questionHeight}px)`;
+    });
+    
+    // Start fade-out animation for target question
+    questionEl.classList.add('animating-out');
+    
+    // Wait for animation to complete
+    setTimeout(() => {
+      // Update the data
+      const q = questionsData.find(q => q.id === parseInt(id));
+      if (q) q.answered = !q.answered;
+      
+      // Re-render everything
+      renderQuestions();
+      
+      // Find the element again (it will be a new element after re-render)
+      const newQuestionEl = document.querySelector(`.question[data-id="${id}"]`);
+      if (newQuestionEl) {
+        // Apply fade-in animation to the new element
+        newQuestionEl.style.opacity = '0';
+        newQuestionEl.style.transform = 'translateY(20px)';
+        
+        // Force a reflow to ensure the animation plays
+        void newQuestionEl.offsetWidth;
+        
+        // Remove the manual styling to let CSS transitions take over
+        setTimeout(() => {
+          newQuestionEl.style.opacity = '';
+          newQuestionEl.style.transform = '';
+          
+          // Remove from tracking after animation completes
+          setTimeout(() => {
+            animatingElements.delete(id);
+          }, 500);
+        }, 50);
+      } else {
+        // If element wasn't found, just clean up
+        animatingElements.delete(id);
+      }
+    }, 500); // Match this to your CSS transition duration
+  } else {
+    // For un-marking as answered, simplify the animation
+    questionEl.classList.add('animating-out');
+    
+    setTimeout(() => {
+      // Update the data
+      const q = questionsData.find(q => q.id === parseInt(id));
+      if (q) q.answered = !q.answered;
+      
+      // Re-render
+      renderQuestions();
+      
+      // Find the element again
+      const newQuestionEl = document.querySelector(`.question[data-id="${id}"]`);
+      if (newQuestionEl) {
+        newQuestionEl.style.opacity = '0';
+        
+        setTimeout(() => {
+          newQuestionEl.style.opacity = '';
+          animatingElements.delete(id);
+        }, 50);
+      } else {
+        animatingElements.delete(id);
+      }
+    }, 750);
+  }
 }
 
 function removeQuestion(id) {
