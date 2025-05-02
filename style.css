@@ -132,43 +132,9 @@ body {
       margin-bottom: 15px;
       border-radius: 4px;
       position: relative;
-    }
-    .question-header {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 8px;
-    }
-    .question-time {
-      color: #666;
-      font-size: 12px;
-      text-align: right;
-    }
-    .question-text {
-      font-size: 16px;
-      margin-bottom: 10px;
-    }
-    .question-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 14px;
-    }
-    .question-author {
-      color: #555;
-    }
-    .status {
-      padding: 10px;
-      margin-bottom: 20px;
-      border-radius: 4px;
-    }
-    .connected { background-color: #d4edda; color: #155724; }
-    .connecting { background-color: #fff3cd; color: #856404; }
-    .error { background-color: #f8d7da; color: #721c24; }
-    .hidden { display: none; }
-    .no-questions {
-      text-align: center;
-      padding: 40px 0;
-      color: #666;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      opacity: 1;
+      transform: translateY(0);
     }
 
 .new-entry {
@@ -180,54 +146,9 @@ body {
   transition: transform 0.5s ease-out, opacity 0.5s ease-out;
 }
 
-.new-badge {
-  background-color: #4caf50;
-  color: white;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  margin-left: 8px;
-}
-
 .status.new-entries {
   background-color: #4caf50;
   color: white;
-}
-
-/* Add this to your existing CSS file */
-
-.admin-btn {
-  padding: 5px 10px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-right: 5px;
-}
-
-.tick-btn {
-  background-color: #4CAF50;
-  color: white;
-  font-weight: bold;
-}
-
-.tick-btn:hover {
-  background-color: #45a049;
-}
-
-.remove-btn {
-  background-color: #f44336;
-  color: white;
-  font-weight: bold;
-}
-
-.remove-btn:hover {
-  background-color: #d32f2f;
-}
-
-.answered {
-  opacity: 0.7;
-  background-color: #f0f0f0;
-  border-left: 4px solid #4CAF50;
 }
 
 /* This ensures the question animations work properly */
@@ -292,21 +213,12 @@ body {
   margin-top: 10px;
 }
 
-.question-author {
-  color: #555;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-}
-
-.question-author::before {
-  content: "";
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  background-color: #4285f4;
-  border-radius: 50%;
-  margin-right: 8px;
+.question.fade-out {
+  opacity: 0;
+  transform: translateY(-10px);
+  height: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .admin-actions {
@@ -329,30 +241,6 @@ body {
   transition: all 0.2s ease;
 }
 
-.tick-btn {
-  background-color: #4CAF50;
-  color: white;
-  font-weight: bold;
-  font-size: 16px;
-}
-
-.tick-btn:hover {
-  background-color: #3d9140;
-  transform: scale(1.05);
-}
-
-.remove-btn {
-  background-color: #f44336;
-  color: white;
-  font-weight: bold;
-  font-size: 16px;
-}
-
-.remove-btn:hover {
-  background-color: #d32f2f;
-  transform: scale(1.05);
-}
-
 .new-badge {
   background-color: #4caf50;
   color: white;
@@ -369,7 +257,7 @@ body {
 .question-time {
   color: #666;
   font-size: 13px;
-  margin-left: 15px;
+  margin-left: auto;
   font-weight: 400;
 }
 
@@ -414,6 +302,17 @@ body {
   100% { opacity: 0.9; }
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .no-questions {
   text-align: center;
   padding: 40px 20px;
@@ -421,4 +320,26 @@ body {
   font-style: italic;
   background-color: rgba(0, 0, 0, 0.02);
   border-radius: 8px;
+}
+
+.question.animating-out {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.question.moving-up {
+  /* Animation for questions that need to move up to fill the gap */
+  transition: transform 0.5s ease 0.1s; /* Slight delay to start after fade begins */
+}
+
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
