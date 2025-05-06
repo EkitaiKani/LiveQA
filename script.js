@@ -139,7 +139,6 @@ function getQuestionKey(question) {
 
 let isFirstLoad = true;
 
-// Fixed renderQuestions function (removed duplicate function)
 function renderQuestions() {
   if (questionsData.length === 0) {
     questionsList.innerHTML = '<div class="no-questions">No questions found. Questions will appear here when submitted.</div>';
@@ -147,34 +146,35 @@ function renderQuestions() {
   }
 
   const sortMethod = document.getElementById('sort-method').value;
-  const sorted = [...questionsData];
 
-  // First sort by the selected method
-  if (sortMethod === 'newest') {
-    sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  } else if (sortMethod === 'oldest') {
-    sorted.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  }
-
-  // Then move answered questions to the bottom
-  sorted.sort((a, b) => {
+  const sorted = [...questionsData].sort((a, b) => {
+    // Move unanswered questions to the top
     if (a.answered && !b.answered) return 1;
     if (!a.answered && b.answered) return -1;
+
+    // Within same answered status, sort by timestamp
+    const dateA = new Date(a.timestamp);
+    const dateB = new Date(b.timestamp);
+
+    if (sortMethod === 'newest') {
+      return dateB - dateA;
+    } else if (sortMethod === 'oldest') {
+      return dateA - dateB;
+    }
+
     return 0;
   });
 
-  // Create HTML for all questions with improved layout
+  // Create HTML
   questionsList.innerHTML = sorted.map((q, index) => {
     const time = new Date(q.timestamp);
     const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const formattedDate = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
-
-    // Add init-load class if this is the first time loading
     const initialLoadClass = isFirstLoad ? 'init-load' : '';
 
     return `
       <div class="question ${q.answered ? 'answered' : ''} ${q.isNew ? 'new-entry' : ''} ${initialLoadClass}"
-           data-id="${q.id}" data-index="${index}"
+           data-id="${q.id}""
            style="${q.isNew ? 'opacity: 0; transform: translateY(-20px);' : ''}">
         <div class="question-text">${escapeHtml(q.question)}</div>
         <div class="question-meta">
@@ -188,46 +188,33 @@ function renderQuestions() {
     `;
   }).join('');
 
-  // Apply animations after a short delay to ensure the DOM has updated
+  // Animations and event listeners
   setTimeout(() => {
-    // Handle new questions animation
-    const newQuestionElements = document.querySelectorAll('.new-entry');
-    newQuestionElements.forEach(el => {
-      // Trigger animation through style changes
+    document.querySelectorAll('.new-entry').forEach(el => {
       el.style.transition = 'transform 0.5s ease-out, opacity 0.5s ease-out';
       el.style.opacity = '1';
       el.style.transform = 'translateY(0)';
     });
 
-    // Handle initial load animation with staggered effect
     if (isFirstLoad) {
-      const allQuestions = document.querySelectorAll('.question.init-load');
-      allQuestions.forEach((el, i) => {
-        const delay = 50 + (i * 100); // Stagger the animations
+      document.querySelectorAll('.question.init-load').forEach((el, i) => {
+        const delay = 50 + (i * 100);
         setTimeout(() => {
           el.style.transition = 'transform 0.5s ease-out, opacity 0.5s ease-out';
           el.style.opacity = '1';
           el.style.transform = 'translateY(0)';
-
-          // Remove the init-load class after animation completes
-          setTimeout(() => {
-            el.classList.remove('init-load');
-          }, 500);
+          setTimeout(() => el.classList.remove('init-load'), 500);
         }, delay);
       });
-
-      // After all animations, mark first load as complete
       isFirstLoad = false;
     }
 
-    // Clear the "new" status after animation completes
     setTimeout(() => {
       questionsData.forEach(q => {
         if (q.isNew) q.isNew = false;
       });
     }, 2000);
 
-    // Add click event listeners to questions for modal functionality
     addQuestionClickListeners();
   }, 50);
 }
@@ -241,8 +228,7 @@ function addQuestionClickListeners() {
       // Don't open modal if clicking on admin actions
       if (!event.target.closest('.admin-actions')) {
         const questionId = parseInt(this.getAttribute('data-id'));
-        const questionIndex = parseInt(this.getAttribute('data-index'));
-        const questionData = questionsData[questionIndex];
+        const questionData = questionsData.find(q => q.id === questionId);
 
         openQuestionModal(questionData);
       }
