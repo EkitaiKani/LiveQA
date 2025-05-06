@@ -332,6 +332,100 @@ body {
   transition: transform 0.5s ease 0.1s; /* Slight delay to start after fade begins */
 }
 
+.modal {
+  display: flex; /* Enable Flexbox for centering */
+  justify-content: center;
+  align-items: center;
+
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.5);
+
+  opacity: 0;
+  pointer-events: none; /* Prevent clicks when hidden */
+  transition: opacity 0.3s ease;
+}
+
+/* When modal is shown */
+.modal.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 30px;
+  border-radius: 10px;
+  width: 80%;
+  height: 80%;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.25);
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Center content vertically by default */
+  position: relative;
+  transform: translateY(-30px);
+  opacity: 0;
+  transition: all 0.4s ease;
+}
+
+/* make the question take up the rest of the space */
+.modal-question {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* Time sticks to bottom */
+.modal-time {
+  align-self: flex-end;
+  margin-top: auto; /* Push to bottom */
+  font-size: 14px;
+  color: #555;
+}
+
+/* Animate in the content */
+.modal.show .modal-content {
+  transform: translateY(0);
+  opacity: 1;
+}
+    
+    .close {
+      position: absolute;
+      right: 20px;
+      top: 15px;
+      font-size: 28px;
+      font-weight: bold;
+      color: #777;
+      cursor: pointer;
+    }
+    
+    .close:hover {
+      color: #333;
+    }
+    
+    .modal-question {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      line-height: 1.4;
+      color: #333;
+    }
+    
+    .modal-time {
+      font-size: 16px;
+      color: #777;
+      margin-bottom: 10px;
+    }
+    
+
 
 @keyframes fadeIn {
   from {

@@ -7,12 +7,12 @@ const apiKey = 'YOUR-API-KEY'; // Replace this with your real API key
 
 const connectBtn = document.getElementById('connect-btn');
 const statusEl = document.getElementById('status');
-const questionsList = document.getElementById('questions-list');  
+const questionsList = document.getElementById('questions-list');
 
 document.addEventListener('DOMContentLoaded', () => {
   const configHeader = document.querySelector('.config-header');
   const configContent = document.querySelector('.config-content');
-  
+
   configHeader.addEventListener('click', () => {
       configHeader.classList.toggle('collapsed');
       configContent.classList.toggle('collapsed');
@@ -84,11 +84,11 @@ function processQuestions(rows) {
     updateStatus(`Error: Column "${questionColumn}" not found.`, 'error');
     return;
   }
-  
+
   // Store the previous questions to compare with new data
   const prevQuestionMap = new Map();
   questionsData.forEach(q => {
-    const key = `${q.question}_${q.timestamp}`;
+    const key = getQuestionKey(q);
     prevQuestionMap.set(key, q);
   });
 
@@ -97,18 +97,18 @@ function processQuestions(rows) {
   questionsData.forEach(q => {
     if (q.removed) removedQuestions.add(getQuestionKey(q));
   });
-  
+
   // Process the current data from the sheet
   const newQuestionsData = rows.slice(1).map((row, i) => {
     const question = row[questionIndex] || '';
     const timestamp = row[timestampIndex] || new Date().toISOString();
-    
-    const key = `${question}_${timestamp}`;
+
+    const key = getQuestionKey({question, timestamp});
     const existing = prevQuestionMap.get(key);
-    
+
     // Preserve removed status
     const isRemoved = removedQuestions.has(key);
-    
+
     return {
       id: i,
       question,
@@ -119,60 +119,61 @@ function processQuestions(rows) {
       removed: isRemoved || (existing ? existing.removed : false)
     };
   }).filter(q => q.question && !q.removed); // Don't include removed questions
-  
+
   // Check if we have new entries
   const newEntries = newQuestionsData.filter(q => q.isNew);
   if (newEntries.length > 0) {
     updateStatus(`Connected! ${newEntries.length} new question(s) received.`, 'new-entries');
     playNotificationSound();
   }
-  
+
   // Update the global questionsData
   questionsData = newQuestionsData;
-  
+
   renderQuestions();
 }
 
 function getQuestionKey(question) {
   return `${question.question}_${question.timestamp}`;
 }
+
 let isFirstLoad = true;
 
-// Updated renderQuestions function with initial load animation
+// Fixed renderQuestions function (removed duplicate function)
 function renderQuestions() {
   if (questionsData.length === 0) {
     questionsList.innerHTML = '<div class="no-questions">No questions found. Questions will appear here when submitted.</div>';
     return;
   }
-  
+
   const sortMethod = document.getElementById('sort-method').value;
   const sorted = [...questionsData];
-  
+
   // First sort by the selected method
   if (sortMethod === 'newest') {
     sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   } else if (sortMethod === 'oldest') {
-    sorted.sort((b, a) => new Date(b.timestamp) - new Date(a.timestamp));
+    sorted.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   }
- 
+
   // Then move answered questions to the bottom
   sorted.sort((a, b) => {
     if (a.answered && !b.answered) return 1;
     if (!a.answered && b.answered) return -1;
     return 0;
   });
- 
+
   // Create HTML for all questions with improved layout
   questionsList.innerHTML = sorted.map((q, index) => {
     const time = new Date(q.timestamp);
     const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const formattedDate = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
-   
+
     // Add init-load class if this is the first time loading
     const initialLoadClass = isFirstLoad ? 'init-load' : '';
-    
+
     return `
-      <div class="question ${q.answered ? 'answered' : ''} ${q.isNew ? 'new-entry' : ''} ${initialLoadClass}" 
+      <div class="question ${q.answered ? 'answered' : ''} ${q.isNew ? 'new-entry' : ''} ${initialLoadClass}"
            data-id="${q.id}" data-index="${index}"
            style="${q.isNew ? 'opacity: 0; transform: translateY(-20px);' : ''}">
         <div class="question-text">${escapeHtml(q.question)}</div>
@@ -181,12 +182,12 @@ function renderQuestions() {
           <span class="question-time">${formattedDate} at ${formattedTime}</span>
         </div>
         <div class="admin-actions">
-          <i class="fa-solid fa-minus" onclick="toggleAnswered(${q.id})" title="${q.answered ? 'Mark as unanswered' : 'Mark as answered'}"></i>
+          <i class="fa-solid fa-minus" onclick="toggleAnswered(${q.id}, event)" title="${q.answered ? 'Mark as unanswered' : 'Mark as answered'}"></i>
         </div>
       </div>
     `;
   }).join('');
- 
+
   // Apply animations after a short delay to ensure the DOM has updated
   setTimeout(() => {
     // Handle new questions animation
@@ -197,7 +198,7 @@ function renderQuestions() {
       el.style.opacity = '1';
       el.style.transform = 'translateY(0)';
     });
-   
+
     // Handle initial load animation with staggered effect
     if (isFirstLoad) {
       const allQuestions = document.querySelectorAll('.question.init-load');
@@ -207,36 +208,51 @@ function renderQuestions() {
           el.style.transition = 'transform 0.5s ease-out, opacity 0.5s ease-out';
           el.style.opacity = '1';
           el.style.transform = 'translateY(0)';
-          
+
           // Remove the init-load class after animation completes
           setTimeout(() => {
             el.classList.remove('init-load');
           }, 500);
         }, delay);
       });
-      
+
       // After all animations, mark first load as complete
       isFirstLoad = false;
     }
-   
+
     // Clear the "new" status after animation completes
     setTimeout(() => {
       questionsData.forEach(q => {
         if (q.isNew) q.isNew = false;
       });
     }, 2000);
+
+    // Add click event listeners to questions for modal functionality
+    addQuestionClickListeners();
   }, 50);
 }
 
-function updateStatus(msg, type) {
-  statusEl.textContent = msg;
-  statusEl.className = `status ${type}`;
+// Function to add click event listeners to all question cards
+function addQuestionClickListeners() {
+  const questionCards = document.querySelectorAll('.question');
+
+  questionCards.forEach(card => {
+    card.addEventListener('click', function(event) {
+      // Don't open modal if clicking on admin actions
+      if (!event.target.closest('.admin-actions')) {
+        const questionId = parseInt(this.getAttribute('data-id'));
+        const questionIndex = parseInt(this.getAttribute('data-index'));
+        const questionData = questionsData[questionIndex];
+
+        openQuestionModal(questionData);
+      }
+    });
+  });
 }
 
-function upvoteQuestion(id) {
-  const q = questionsData.find(q => q.id === id);
-  if (q) q.votes++;
-  renderQuestions();
+function updateStatus(msg, type) {
+   statusEl.textContent = msg;
+   statusEl.className = `status ${type}`;
 }
 
 // Keep track of elements being animated
@@ -251,70 +267,76 @@ function getElementHeight(el) {
 }
 
 // Modified toggle function that adds animation
-function toggleAnswered(id) {
+function toggleAnswered(id, event) {
+  // Stop event propagation
+  if (event) {
+    event.stopPropagation();
+  }
+  
   // Find the element
   const questionEl = document.querySelector(`.question[data-id="${id}"]`);
-  
+  if (!questionEl) return;
+
   // If element is already being animated, ignore the click
   if (animatingElements.has(id)) return;
-  
+
   // Mark this element as being animated
   animatingElements.add(id);
-  
+
   // Get element's height and position
   const questionHeight = getElementHeight(questionEl);
   const questionRect = questionEl.getBoundingClientRect();
-  
+
   // Find all elements below this one that need to move up
-  const container = questionEl.closest('.questions-container');
+  const container = questionEl.closest('.questions-container') || questionEl.parentElement;
   const otherQuestions = Array.from(container.querySelectorAll('.question:not(.answered)'))
     .filter(el => {
       const rect = el.getBoundingClientRect();
       return rect.top > questionRect.top && el.getAttribute('data-id') != id;
     });
-  
+
   // Start animation process
   if (!questionEl.classList.contains('answered')) {
     // Animate other questions to move up
     otherQuestions.forEach(el => {
       // Add class for animation
       el.classList.add('moving-up');
-      
+
       // Store original transform to restore later
       const originalTransform = window.getComputedStyle(el).transform;
       el._originalTransform = originalTransform === 'none' ? '' : originalTransform;
-      
+
       // Apply transform to move up by the height of the question being removed
       el.style.transform = `translateY(-${questionHeight}px)`;
     });
-    
+
     // Start fade-out animation for target question
     questionEl.classList.add('animating-out');
-    
+
     // Wait for animation to complete
     setTimeout(() => {
       // Update the data
       const q = questionsData.find(q => q.id === parseInt(id));
       if (q) q.answered = !q.answered;
-      
+
       // Re-render everything
       renderQuestions();
-      
+
       // Find the element again (it will be a new element after re-render)
       const newQuestionEl = document.querySelector(`.question[data-id="${id}"]`);
       if (newQuestionEl) {
         // Apply fade-in animation to the new element
         newQuestionEl.style.opacity = '0';
         newQuestionEl.style.transform = 'translateY(20px)';
-        
+
         // Force a reflow to ensure the animation plays
         void newQuestionEl.offsetWidth;
-        
+
         // Remove the manual styling to let CSS transitions take over
         setTimeout(() => {
           newQuestionEl.style.opacity = '';
           newQuestionEl.style.transform = '';
-          
+
           // Remove from tracking after animation completes
           setTimeout(() => {
             animatingElements.delete(id);
@@ -328,20 +350,20 @@ function toggleAnswered(id) {
   } else {
     // For un-marking as answered, simplify the animation
     questionEl.classList.add('animating-out');
-    
+
     setTimeout(() => {
       // Update the data
       const q = questionsData.find(q => q.id === parseInt(id));
       if (q) q.answered = !q.answered;
-      
+
       // Re-render
       renderQuestions();
-      
+
       // Find the element again
       const newQuestionEl = document.querySelector(`.question[data-id="${id}"]`);
       if (newQuestionEl) {
         newQuestionEl.style.opacity = '0';
-        
+
         setTimeout(() => {
           newQuestionEl.style.opacity = '';
           animatingElements.delete(id);
@@ -380,6 +402,56 @@ function playNotificationSound() {
   } catch (e) {
     console.log('Sound notification not supported in this browser');
   }
+}
+
+// Open question modal
+function openQuestionModal(question) {
+  if (!question) return;
+  
+  const modal = document.getElementById('questionModal');
+  const modalQuestionText = document.getElementById('modalQuestionText');
+  const modalQuestionTime = document.getElementById('modalQuestionTime');
+
+  // Set question text
+  modalQuestionText.textContent = question.question;
+
+  // Format time information
+  const time = new Date(question.timestamp);
+  const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formattedDate = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  modalQuestionTime.textContent = `Submitted on ${formattedDate} at ${formattedTime}`;
+
+  // Show modal with animation
+  modal.style.display = 'flex';
+
+  // Trigger fade-in animation
+  setTimeout(() => {
+    modal.classList.add('show');
+  }, 10);
+}
+
+// Close modal when clicking the X
+document.querySelector('.close').addEventListener('click', function() {
+  closeModal();
+});
+
+// Close modal when clicking outside
+window.addEventListener('click', function(event) {
+  const modal = document.getElementById('questionModal');
+  if (event.target === modal) {
+    closeModal();
+  }
+});
+
+// Function to close modal with animation
+function closeModal() {
+  const modal = document.getElementById('questionModal');
+  modal.classList.remove('show');
+
+  // Wait for animation to complete before hiding
+  setTimeout(() => {
+    modal.style.display = 'none';
+  }, 300);
 }
 
 // Initialize the questions display
