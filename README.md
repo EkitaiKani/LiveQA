@@ -9,7 +9,9 @@ Hi hi hiiii this is my website thingy that shows questions from that Google thin
 - ✅ **You can check them off like "I ANSWERED U STOP ASKING"**
 - 🔧 **Change stuff if you want idk**
 - 🔢 **Sort the questions** if you care about time or if people clicked the up-arrow thing a lot (but not sure how that works lol)
-- 🌟 **NEW questions get like a badge or something** so they look important I guess??
+- 🌟 **questions get like a badge or something** so they look important I guess??
+- 🖱️ **CLICKY QUESTION = BIG POPUP WOW** like BOOM the question EXPLODES (not really) and takes over your screen so you can read it like a nerd.
+- 🕳️ **you wanna close it?** just click somewhere. ANYWHERE. Like bye bye question, go back to the shadow realm
 
 ## 🧠 How 2 Start
 
