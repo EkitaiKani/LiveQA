@@ -25,25 +25,54 @@ document.getElementById('sort-method').addEventListener('change', renderQuestion
 function connectToSheet() {
   const sheetId = document.getElementById('sheet-id').value.trim();
   const sheetTab = 'Form Responses 1';
-
+  
   if (!sheetId) {
     updateStatus('Please enter a valid Google Sheet ID', 'error');
     return;
   }
-
+  
   updateStatus('Connecting to Google Sheet...', 'connecting');
   const apiUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(sheetTab)}?key=${apiKey}`;
-
+  
   fetch(apiUrl)
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) {
+        throw new Error(`API returned status: ${res.status}`);
+      }
+      return res.json();
+    })
     .then(data => {
-      if (!data.values || data.values.length < 2) throw new Error("No data found");
+      // Check if we have data values at all
+      if (!data.values || data.values.length === 0) {
+        updateStatus('Connected, but the sheet appears to be empty.', 'warning');
+        handleEmptySheet(sheetId, sheetTab);
+        return;
+      }
+      
+      // Success case - we have headers and at least one row of data
       handleSuccessfulConnection(sheetId, sheetTab);
     })
     .catch(err => {
-      console.error(err);
+      console.error('Connection error:', err);
       updateStatus(`Error: ${err.message}`, 'error');
     });
+}
+
+
+function handleEmptySheet(sheetId, sheetTab) {
+  // Still mark as connected but with no data
+  isConnected = true;
+  questionsData = [];
+  renderQuestions(); // Render an empty state
+  
+  // Set up polling in case data gets added later
+  const refreshRate = parseInt(document.getElementById('refresh-rate').value) || 5;
+  clearInterval(refreshInterval);
+  refreshInterval = setInterval(fetchQuestions, refreshRate * 500);
+  
+  // Maybe show a helpful message in the UI
+  updateStatus('Connected to Google Sheet! Questions will refresh automatically.', 'connected');
+
 }
 
 function handleSuccessfulConnection(sheetId, sheetTab) {
