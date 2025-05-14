@@ -1,9 +1,43 @@
+// Update modal with current question content
+function updateModalWithCurrentQuestion() {
+  if (sortedQuestionsCache.length === 0 || currentQuestionIndex < 0 || currentQuestionIndex >= sortedQuestionsCache.length) {
+    return;
+  }
+
+  const question = sortedQuestionsCache[currentQuestionIndex];
+  if (!question) return;
+  
+  // Update modal content with current question
+  const modalQuestionText = document.getElementById('modalQuestionText');
+  const modalQuestionTime = document.getElementById('modalQuestionTime');
+  
+  if (modalQuestionText && modalQuestionTime) {
+    // Set question text
+    modalQuestionText.textContent = question.question;
+    
+    // Format time information
+    const time = new Date(question.timestamp);
+    const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const formattedDate = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    modalQuestionTime.textContent = `Submitted on ${formattedDate} at ${formattedTime}`;
+    
+    // Update navigation button states
+    updateNavigationButtons();
+    
+    // Add a fade + slide-in animation class
+    modalQuestionText.classList.add('fade-slide-in');
+  }
+}// Fix for script.js
+
 let questionsData = [];
 let previousQuestionCount = 0;  // Track previous number of questions
 let refreshInterval;
 let isConnected = false;
+let hasQuestions = false; // Flag to track if questions are available
+let currentQuestionIndex = 0;
+let sortedQuestionsCache = [];
 
-const apiKey = 'AIzaSyA6wivKowta0v1Eyf56ZsUdIYQXK36_XvY'; // Replace this with your real API key
+const apiKey = 'YOUR-API-KEY'; // Replace this with your real API key
 
 const connectBtn = document.getElementById('connect-btn');
 const statusEl = document.getElementById('status');
@@ -17,10 +51,84 @@ document.addEventListener('DOMContentLoaded', () => {
       configHeader.classList.toggle('collapsed');
       configContent.classList.toggle('collapsed');
   });
+
+  // Set up event listeners for question navigation
+  document.getElementById('nextQuestionBtn').addEventListener('click', function() {
+    navigateQuestion('next');
+  });
+
+  // Initial setup for noQuestionsDiv click listener
+  setupNoQuestionsListener();
+  
+  // Event listener for previous button
+  document.getElementById('previous').addEventListener('click', function() {
+    navigateQuestion('prev');
+  });
+
+  // Close modal when clicking outside
+  window.addEventListener('click', function(event) {
+    const modal = document.getElementById('questionModal');
+    if (event.target === modal) {
+      closeModal('questionModal');
+    }
+  });
+  
+  // Close modal when clicking the X
+  const closeButton = document.querySelector('.close');
+  if (closeButton) {
+    closeButton.addEventListener('click', function() {
+      closeModal('questionModal');
+    });
+  }
+
+  // Add event listeners for sort method changes
+  const sortMethodSelect = document.getElementById('sort-method');
+  if (sortMethodSelect) {
+    sortMethodSelect.addEventListener('change', renderQuestions);
+  }
+
+  // Add keyboard navigation for modals
+  window.addEventListener('keydown', handleKeyboardNavigation);
+
+  // Initialize the questions display
+  renderQuestions();
 });
 
+// Function to handle keyboard navigation
+function handleKeyboardNavigation(event) {
+  // Only handle keyboard navigation when modal is open
+  const modal = document.getElementById('questionModal');
+  if (modal && modal.style.display === 'flex') {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      navigateQuestion('next');
+      event.preventDefault();
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      navigateQuestion('prev');
+      event.preventDefault();
+    } else if (event.key === 'Escape') {
+      closeModal('questionModal');
+      event.preventDefault();
+    }
+  }
+}
+
+// Setup listener for no questions div
+function setupNoQuestionsListener() {
+  const noQuestionsDiv = document.getElementById('noQuestionsDiv');
+  if (noQuestionsDiv) {
+    noQuestionsDiv.addEventListener('click', () => {
+      if (hasQuestions && sortedQuestionsCache.length > 0) {
+        // If we have questions, show the first one
+        openQuestionModal(sortedQuestionsCache[0]);
+      } else {
+        // Otherwise show the empty state
+        openNoQuestionsModal();
+      }
+    });
+  }
+}
+
 connectBtn.addEventListener('click', connectToSheet);
-document.getElementById('sort-method').addEventListener('change', renderQuestions);
 
 function connectToSheet() {
   const sheetId = document.getElementById('sheet-id').value.trim();
@@ -58,7 +166,6 @@ function connectToSheet() {
     });
 }
 
-
 function handleEmptySheet(sheetId, sheetTab) {
   // Still mark as connected but with no data
   isConnected = true;
@@ -72,7 +179,6 @@ function handleEmptySheet(sheetId, sheetTab) {
   
   // Maybe show a helpful message in the UI
   updateStatus('Connected to Google Sheet! Questions will refresh automatically.', 'connected');
-
 }
 
 function handleSuccessfulConnection(sheetId, sheetTab) {
@@ -121,6 +227,19 @@ function processQuestions(rows) {
     return;
   }
   
+  // Check if the modal is currently open
+  const modal = document.getElementById('questionModal');
+  const isModalOpen = modal && modal.style.display === 'flex';
+  let currentQuestionKey = null;
+  
+  // If modal is open, save the key of the currently displayed question
+  if (isModalOpen && sortedQuestionsCache.length > 0 && currentQuestionIndex >= 0) {
+    const currentQuestion = sortedQuestionsCache[currentQuestionIndex];
+    if (currentQuestion) {
+      currentQuestionKey = getQuestionKey(currentQuestion);
+    }
+  }
+  
   // Store the previous questions to compare with new data
   const prevQuestionMap = new Map();
   questionsData.forEach(q => {
@@ -166,7 +285,38 @@ function processQuestions(rows) {
   
   // Update the global questionsData
   questionsData = newQuestionsData;
+  hasQuestions = questionsData.length > 0; // Update the hasQuestions flag
+  
+  // Render the updated questions list
   renderQuestions();
+  
+  // If the modal was open, handle the modal update
+  if (isModalOpen) {
+    // Update the sorted questions cache
+    updateSortedQuestionsCache();
+    
+    if (currentQuestionKey) {
+      // Find the index of the previously displayed question in the updated list
+      const newIndex = sortedQuestionsCache.findIndex(q => getQuestionKey(q) === currentQuestionKey);
+      
+      if (newIndex >= 0) {
+        // If found, update the current index and refresh the displayed question
+        currentQuestionIndex = newIndex;
+        updateModalWithCurrentQuestion();
+      } else if (sortedQuestionsCache.length > 0) {
+        // If not found but we have questions, show the first question
+        currentQuestionIndex = 0;
+        updateModalWithCurrentQuestion();
+      } else {
+        // If no questions available, show the empty state
+        openNoQuestionsModal();
+      }
+    } else if (sortedQuestionsCache.length > 0) {
+      // If we didn't have a current question but now we have questions, show the first one
+      currentQuestionIndex = 0;
+      updateModalWithCurrentQuestion();
+    }
+  }
 }
 
 function getQuestionKey(question) {
@@ -176,42 +326,21 @@ function getQuestionKey(question) {
 let isFirstLoad = true;
 
 function renderQuestions() {
+  // Update sorted questions cache
+  updateSortedQuestionsCache();
+  
   if (questionsData.length === 0) {
-    questionsList.innerHTML = '<div class="no-questions">No questions found. Questions will appear here when submitted.</div>';
+    questionsList.innerHTML = '<div id="noQuestionsDiv" class="no-questions">No questions found. Questions will appear here when submitted.</div>';
+    hasQuestions = false;
+    // Re-attach event listener to the newly created noQuestionsDiv
+    setupNoQuestionsListener();
     return;
   }
   
-  const sortMethod = document.getElementById('sort-method').value;
-  const sorted = [...questionsData].sort((a, b) => {
-    // If sort method is display, prioritize displayOrder
-    if (sortMethod === 'display') {
-      // Convert displayOrder to numbers for proper comparison
-      const orderA = parseInt(a.displayOrder) || Infinity;
-      const orderB = parseInt(b.displayOrder) || Infinity;
-      
-      // Sort by displayOrder (lower numbers first)
-      return orderA - orderB;
-    }
-    
-    // For other sort methods, use the existing logic
-    // Move unanswered questions to the top
-    if (a.answered && !b.answered) return 1;
-    if (!a.answered && b.answered) return -1;
-    
-    // Within same answered status, sort by timestamp
-    const dateA = new Date(a.timestamp);
-    const dateB = new Date(b.timestamp);
-    if (sortMethod === 'newest') {
-      return dateB - dateA;
-    } else if (sortMethod === 'oldest') {
-      return dateA - dateB;
-    }
-    
-    return 0;
-  });
+  hasQuestions = true;
   
   // Create HTML
-  questionsList.innerHTML = sorted.map((q, index) => {
+  questionsList.innerHTML = sortedQuestionsCache.map((q, index) => {
     const time = new Date(q.timestamp);
     const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const formattedDate = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
@@ -223,7 +352,7 @@ function renderQuestions() {
     
     return `
       <div class="question ${q.answered ? 'answered' : ''} ${q.isNew ? 'new-entry' : ''} ${initialLoadClass}"
-           data-id="${q.id}""
+           data-id="${q.id}"
            style="${q.isNew ? 'opacity: 0; transform: translateY(-20px);' : ''}">
         <div class="question-text">${escapeHtml(q.question)}</div>
         <div class="question-meta">
@@ -437,43 +566,70 @@ function playNotificationSound() {
   }
 }
 
-// Keep track of current question index in the sorted questions array
-let currentQuestionIndex = 0;
-let sortedQuestionsCache = [];
-
-// Open question modal
-function openQuestionModal(question) {
-  if (!question) return;
+// Open any modal with optional content
+function openModal(modalId, options = {}) {
+  const modal = document.getElementById(modalId);
+  if (!modal) return;
   
-  // Get the currently sorted questions (reusing the existing sort logic)
-  updateSortedQuestionsCache();
-  
-  // Find the index of this question in the sorted array
-  currentQuestionIndex = sortedQuestionsCache.findIndex(q => q.id === question.id);
-  
-  const modal = document.getElementById('questionModal');
-  const modalQuestionText = document.getElementById('modalQuestionText');
-  const modalQuestionTime = document.getElementById('modalQuestionTime');
-  
-  // Set question text
-  modalQuestionText.textContent = question.question;
-  
-  // Format time information
-  const time = new Date(question.timestamp);
-  const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const formattedDate = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  modalQuestionTime.textContent = `Submitted on ${formattedDate} at ${formattedTime}`;
-  
-  // Update navigation button states
-  updateNavigationButtons();
+  // Optional: set content if specified
+  if (options.textContent && options.textTargetId) {
+    const textTarget = document.getElementById(options.textTargetId);
+    if (textTarget) {
+      textTarget.textContent = options.textContent;
+    }
+  }
   
   // Show modal with animation
   modal.style.display = 'flex';
-  
-  // Trigger fade-in animation
   setTimeout(() => {
     modal.classList.add('show');
   }, 10);
+}
+
+// Close modal function
+function closeModal(modalId = 'questionModal') {
+  const modal = document.getElementById(modalId);
+  if (!modal) return;
+  
+  modal.classList.remove('show');
+  setTimeout(() => {
+    modal.style.display = 'none';
+  }, 300); // Match animation time
+}
+
+// Open question modal with specific question content
+function openQuestionModal(question) {
+  if (!question) {
+    // If no question provided, show the empty state
+    openNoQuestionsModal();
+    return;
+  }
+  
+  updateSortedQuestionsCache();
+  currentQuestionIndex = sortedQuestionsCache.findIndex(q => q.id === question.id);
+  
+  // Use the common function to update modal content
+  updateModalWithCurrentQuestion();
+  
+  openModal('questionModal');
+}
+
+// Open the no questions modal with appropriate message
+function openNoQuestionsModal() {
+  let message = 'Questions will appear here once connected to your Google Sheet';
+  
+  if (isConnected && !hasQuestions) {
+    message = 'No questions available yet. Questions will appear once they are received.';
+  }
+  
+  // Use the existing questionModal but with empty state content
+  document.getElementById('modalQuestionText').textContent = message;
+  document.getElementById('modalQuestionTime').textContent = '';
+  
+  // Hide navigation buttons for empty state
+  updateNavigationButtons(true);
+  
+  openModal('questionModal');
 }
 
 // Update the sorted questions cache using the same sort logic from renderQuestions
@@ -507,10 +663,13 @@ function updateSortedQuestionsCache() {
     return 0;
   });
 }
+
 // Navigate to next/previous question
 function navigateQuestion(direction) {
   // Make sure we have the latest sorted questions
   updateSortedQuestionsCache();
+  
+  if (sortedQuestionsCache.length === 0) return;
   
   if (direction === 'next' && currentQuestionIndex < sortedQuestionsCache.length - 1) {
     currentQuestionIndex++;
@@ -518,76 +677,28 @@ function navigateQuestion(direction) {
     currentQuestionIndex--;
   }
   
-  const question = sortedQuestionsCache[currentQuestionIndex];
-  if (question) {
-    // Update modal content with new question
-    const modalQuestionText = document.getElementById('modalQuestionText');
-    const modalQuestionTime = document.getElementById('modalQuestionTime');
-    
-    // Set question text
-    modalQuestionText.textContent = question.question;
-    
-    // Format time information
-    const time = new Date(question.timestamp);
-    const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const formattedDate = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    modalQuestionTime.textContent = `Submitted on ${formattedDate} at ${formattedTime}`;
-    
-    // Update navigation button states
-    updateNavigationButtons();
-  }
+  updateModalWithCurrentQuestion();
 }
 
-// Update navigation button states (disable at boundaries)
-function updateNavigationButtons() {
+// Update navigation button states
+function updateNavigationButtons(hideAll = false) {
   const prevButton = document.getElementById('previous');
   const nextButton = document.getElementById('nextQuestionBtn');
   
-  // Disable previous button if at the first question
-  if (currentQuestionIndex <= 0) {
-    prevButton.classList.add('disabled');
-  } else {
-    prevButton.classList.remove('disabled');
+  if (!prevButton || !nextButton) return;
+  
+  if (hideAll) {
+    prevButton.style.visibility = 'hidden';
+    nextButton.style.visibility = 'hidden';
+    return;
   }
   
-  // Disable next button if at the last question
-  if (currentQuestionIndex >= sortedQuestionsCache.length - 1) {
-    nextButton.classList.add('disabled');
-  } else {
-    nextButton.classList.remove('disabled');
-  }
+  // Show/hide previous button based on position in questions list
+  prevButton.style.visibility = currentQuestionIndex > 0 ? 'visible' : 'hidden';
+  
+  // Show/hide next button based on position in questions list
+  nextButton.style.visibility = 
+    (sortedQuestionsCache.length > 0 && currentQuestionIndex < sortedQuestionsCache.length - 1) 
+      ? 'visible' 
+      : 'hidden';
 }
-
-
-// Add event listeners when the page loads
-document.addEventListener('DOMContentLoaded', function() {
-  // Event listener for next button
-  document.getElementById('nextQuestionBtn').addEventListener('click', function() {
-    navigateQuestion('next');
-  });
-  
-  // Event listener for previous button
-  document.getElementById('previous').addEventListener('click', function() {
-    navigateQuestion('prev');
-  });
-
-  // Close modal when clicking outside
-window.addEventListener('click', function(event) {
-  const modal = document.getElementById('questionModal');
-  if (event.target === modal) {
-    closeModal();
-  }
-});
-  
-  // Close modal when clicking the X
-  document.querySelector('.close').addEventListener('click', function() {
-    const modal = document.getElementById('questionModal');
-    modal.classList.remove('show');
-    setTimeout(() => {
-      modal.style.display = 'none';
-    }, 300); // Match animation time
-  });
-});
-
-// Initialize the questions display
-renderQuestions();

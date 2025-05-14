@@ -450,3 +450,18 @@ body {
     transform: translateY(0);
   }
 }
+
+@keyframes fadeSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px); /* or translateX(-10px) for slide from left */
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-slide-in {
+  animation: fadeSlideIn 0.5s ease-out;
+}
