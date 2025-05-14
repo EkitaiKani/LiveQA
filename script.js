@@ -104,61 +104,68 @@ function fetchQuestions() {
 function processQuestions(rows) {
   const questionColumn = document.getElementById('question-column').value.trim() || 'Your question';
   const timestampColumn = 'Timestamp';
-
+  const display = "display?";
+  
   const headers = rows[0];
   const questionIndex = headers.indexOf(questionColumn);
   const timestampIndex = headers.indexOf(timestampColumn);
-
+  const displayIndex = headers.indexOf(display);
+  
   if (questionIndex === -1) {
     updateStatus(`Error: Column "${questionColumn}" not found.`, 'error');
     return;
   }
-
+  
+  if (displayIndex === -1) {
+    updateStatus(`Error: Column "${display}" not found.`, 'error');
+    return;
+  }
+  
   // Store the previous questions to compare with new data
   const prevQuestionMap = new Map();
   questionsData.forEach(q => {
     const key = getQuestionKey(q);
     prevQuestionMap.set(key, q);
   });
-
+  
   // Keep track of removed questions
   const removedQuestions = new Set();
   questionsData.forEach(q => {
     if (q.removed) removedQuestions.add(getQuestionKey(q));
   });
-
+  
   // Process the current data from the sheet
-  const newQuestionsData = rows.slice(1).map((row, i) => {
-    const question = row[questionIndex] || '';
-    const timestamp = row[timestampIndex] || new Date().toISOString();
-
-    const key = getQuestionKey({question, timestamp});
-    const existing = prevQuestionMap.get(key);
-
-    // Preserve removed status
-    const isRemoved = removedQuestions.has(key);
-
-    return {
-      id: i,
-      question,
-      timestamp,
-      votes: existing ? existing.votes : 0,
-      answered: existing ? existing.answered : false,
-      isNew: !existing && prevQuestionMap.size > 0, // Mark as new if not in previous data
-      removed: isRemoved || (existing ? existing.removed : false)
-    };
-  }).filter(q => q.question && !q.removed); // Don't include removed questions
-
+  const newQuestionsData = rows.slice(1)
+    .filter(row => row[displayIndex] != '') // Only include rows with display value of 1
+    .map((row, i) => {
+      const question = row[questionIndex] || '';
+      const timestamp = row[timestampIndex] || new Date().toISOString();
+      const displayOrder = row[displayIndex] || undefined;
+      const key = getQuestionKey({question, timestamp});
+      const existing = prevQuestionMap.get(key);
+      // Preserve removed status
+      const isRemoved = removedQuestions.has(key);
+      return {
+        id: i,
+        question,
+        timestamp,
+        displayOrder,
+        votes: existing ? existing.votes : 0,
+        answered: existing ? existing.answered : false,
+        isNew: !existing && prevQuestionMap.size > 0, // Mark as new if not in previous data
+        removed: isRemoved || (existing ? existing.removed : false)
+      };
+    }).filter(q => q.question && !q.removed); // Don't include removed questions
+  
   // Check if we have new entries
   const newEntries = newQuestionsData.filter(q => q.isNew);
   if (newEntries.length > 0) {
     updateStatus(`Connected! ${newEntries.length} new question(s) received.`, 'new-entries');
     playNotificationSound();
   }
-
+  
   // Update the global questionsData
   questionsData = newQuestionsData;
-
   renderQuestions();
 }
 
@@ -173,40 +180,54 @@ function renderQuestions() {
     questionsList.innerHTML = '<div class="no-questions">No questions found. Questions will appear here when submitted.</div>';
     return;
   }
-
+  
   const sortMethod = document.getElementById('sort-method').value;
-
   const sorted = [...questionsData].sort((a, b) => {
+    // If sort method is display, prioritize displayOrder
+    if (sortMethod === 'display') {
+      // Convert displayOrder to numbers for proper comparison
+      const orderA = parseInt(a.displayOrder) || Infinity;
+      const orderB = parseInt(b.displayOrder) || Infinity;
+      
+      // Sort by displayOrder (lower numbers first)
+      return orderA - orderB;
+    }
+    
+    // For other sort methods, use the existing logic
     // Move unanswered questions to the top
     if (a.answered && !b.answered) return 1;
     if (!a.answered && b.answered) return -1;
-
+    
     // Within same answered status, sort by timestamp
     const dateA = new Date(a.timestamp);
     const dateB = new Date(b.timestamp);
-
     if (sortMethod === 'newest') {
       return dateB - dateA;
     } else if (sortMethod === 'oldest') {
       return dateA - dateB;
     }
-
+    
     return 0;
   });
-
+  
   // Create HTML
   questionsList.innerHTML = sorted.map((q, index) => {
     const time = new Date(q.timestamp);
     const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const formattedDate = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
     const initialLoadClass = isFirstLoad ? 'init-load' : '';
-
+    
+    // Add display order indicator if it exists
+    const displayOrderIndicator = q.displayOrder ? 
+      `<span class="display-order">#${q.displayOrder}</span>` : '';
+    
     return `
       <div class="question ${q.answered ? 'answered' : ''} ${q.isNew ? 'new-entry' : ''} ${initialLoadClass}"
            data-id="${q.id}""
            style="${q.isNew ? 'opacity: 0; transform: translateY(-20px);' : ''}">
         <div class="question-text">${escapeHtml(q.question)}</div>
         <div class="question-meta">
+          ${displayOrderIndicator}
           ${q.isNew ? '<span class="new-badge">New</span>' : ''}
           <span class="question-time">${formattedDate} at ${formattedTime}</span>
         </div>
@@ -216,7 +237,7 @@ function renderQuestions() {
       </div>
     `;
   }).join('');
-
+  
   // Animations and event listeners
   setTimeout(() => {
     document.querySelectorAll('.new-entry').forEach(el => {
@@ -224,7 +245,6 @@ function renderQuestions() {
       el.style.opacity = '1';
       el.style.transform = 'translateY(0)';
     });
-
     if (isFirstLoad) {
       document.querySelectorAll('.question.init-load').forEach((el, i) => {
         const delay = 50 + (i * 100);
@@ -237,13 +257,11 @@ function renderQuestions() {
       });
       isFirstLoad = false;
     }
-
     setTimeout(() => {
       questionsData.forEach(q => {
         if (q.isNew) q.isNew = false;
       });
     }, 2000);
-
     addQuestionClickListeners();
   }, 50);
 }
@@ -419,55 +437,157 @@ function playNotificationSound() {
   }
 }
 
+// Keep track of current question index in the sorted questions array
+let currentQuestionIndex = 0;
+let sortedQuestionsCache = [];
+
 // Open question modal
 function openQuestionModal(question) {
   if (!question) return;
   
+  // Get the currently sorted questions (reusing the existing sort logic)
+  updateSortedQuestionsCache();
+  
+  // Find the index of this question in the sorted array
+  currentQuestionIndex = sortedQuestionsCache.findIndex(q => q.id === question.id);
+  
   const modal = document.getElementById('questionModal');
   const modalQuestionText = document.getElementById('modalQuestionText');
   const modalQuestionTime = document.getElementById('modalQuestionTime');
-
+  
   // Set question text
   modalQuestionText.textContent = question.question;
-
+  
   // Format time information
   const time = new Date(question.timestamp);
   const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const formattedDate = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
   modalQuestionTime.textContent = `Submitted on ${formattedDate} at ${formattedTime}`;
-
+  
+  // Update navigation button states
+  updateNavigationButtons();
+  
   // Show modal with animation
   modal.style.display = 'flex';
-
+  
   // Trigger fade-in animation
   setTimeout(() => {
     modal.classList.add('show');
   }, 10);
 }
 
-// Close modal when clicking the X
-document.querySelector('.close').addEventListener('click', function() {
-  closeModal();
-});
+// Update the sorted questions cache using the same sort logic from renderQuestions
+function updateSortedQuestionsCache() {
+  const sortMethod = document.getElementById('sort-method').value;
+  sortedQuestionsCache = [...questionsData].sort((a, b) => {
+    // If sort method is display, prioritize displayOrder
+    if (sortMethod === 'display') {
+      // Convert displayOrder to numbers for proper comparison
+      const orderA = parseInt(a.displayOrder) || Infinity;
+      const orderB = parseInt(b.displayOrder) || Infinity;
+      
+      // Sort by displayOrder (lower numbers first)
+      return orderA - orderB;
+    }
+    
+    // For other sort methods, use the existing logic
+    // Move unanswered questions to the top
+    if (a.answered && !b.answered) return 1;
+    if (!a.answered && b.answered) return -1;
+    
+    // Within same answered status, sort by timestamp
+    const dateA = new Date(a.timestamp);
+    const dateB = new Date(b.timestamp);
+    if (sortMethod === 'newest') {
+      return dateB - dateA;
+    } else if (sortMethod === 'oldest') {
+      return dateA - dateB;
+    }
+    
+    return 0;
+  });
+}
+// Navigate to next/previous question
+function navigateQuestion(direction) {
+  // Make sure we have the latest sorted questions
+  updateSortedQuestionsCache();
+  
+  if (direction === 'next' && currentQuestionIndex < sortedQuestionsCache.length - 1) {
+    currentQuestionIndex++;
+  } else if (direction === 'prev' && currentQuestionIndex > 0) {
+    currentQuestionIndex--;
+  }
+  
+  const question = sortedQuestionsCache[currentQuestionIndex];
+  if (question) {
+    // Update modal content with new question
+    const modalQuestionText = document.getElementById('modalQuestionText');
+    const modalQuestionTime = document.getElementById('modalQuestionTime');
+    
+    // Set question text
+    modalQuestionText.textContent = question.question;
+    
+    // Format time information
+    const time = new Date(question.timestamp);
+    const formattedTime = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const formattedDate = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    modalQuestionTime.textContent = `Submitted on ${formattedDate} at ${formattedTime}`;
+    
+    // Update navigation button states
+    updateNavigationButtons();
+  }
+}
 
-// Close modal when clicking outside
+// Update navigation button states (disable at boundaries)
+function updateNavigationButtons() {
+  const prevButton = document.getElementById('previous');
+  const nextButton = document.getElementById('nextQuestionBtn');
+  
+  // Disable previous button if at the first question
+  if (currentQuestionIndex <= 0) {
+    prevButton.classList.add('disabled');
+  } else {
+    prevButton.classList.remove('disabled');
+  }
+  
+  // Disable next button if at the last question
+  if (currentQuestionIndex >= sortedQuestionsCache.length - 1) {
+    nextButton.classList.add('disabled');
+  } else {
+    nextButton.classList.remove('disabled');
+  }
+}
+
+
+// Add event listeners when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+  // Event listener for next button
+  document.getElementById('nextQuestionBtn').addEventListener('click', function() {
+    navigateQuestion('next');
+  });
+  
+  // Event listener for previous button
+  document.getElementById('previous').addEventListener('click', function() {
+    navigateQuestion('prev');
+  });
+
+  // Close modal when clicking outside
 window.addEventListener('click', function(event) {
   const modal = document.getElementById('questionModal');
   if (event.target === modal) {
     closeModal();
   }
 });
-
-// Function to close modal with animation
-function closeModal() {
-  const modal = document.getElementById('questionModal');
-  modal.classList.remove('show');
-
-  // Wait for animation to complete before hiding
-  setTimeout(() => {
-    modal.style.display = 'none';
-  }, 300);
-}
+  
+  // Close modal when clicking the X
+  document.querySelector('.close').addEventListener('click', function() {
+    const modal = document.getElementById('questionModal');
+    modal.classList.remove('show');
+    setTimeout(() => {
+      modal.style.display = 'none';
+    }, 300); // Match animation time
+  });
+});
 
 // Initialize the questions display
 renderQuestions();

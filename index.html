@@ -38,6 +38,7 @@
             <select id="sort-method">
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
+              <option value="display">Custom Order</option>
             </select>
           </div>
         </div>
@@ -53,9 +54,16 @@
       <div id="questionModal" class="modal">
         <div class="modal-content">
           <span class="close">&times;</span>
-          <div class="modal-question" id="modalQuestionText"></div>
+          <div class="modal-center-wrapper">
+            <div class="modal-container">
+              <i id= "previous" class="fa-solid fa-chevron-left"></i>
+              <div class="modal-question" id="modalQuestionText"></div>
+              <i id="nextQuestionBtn" class="fa-solid fa-chevron-right"></i>
+            </div>
+          </div>
           <div class="modal-time" id="modalQuestionTime"></div>
         </div>
+        
       </div>
       <div id="questions-list">
         <div class="no-questions">

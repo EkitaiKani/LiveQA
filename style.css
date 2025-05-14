@@ -424,8 +424,21 @@ body {
       color: #777;
       margin-bottom: 10px;
     }
-    
 
+    .modal-container {
+      display: flex;
+      align-items: center; /* Vertically center the items */
+      justify-content: space-between; /* Spread arrows on the sides */
+      width: 100%;
+      margin: 0 auto; /* Center the whole row horizontally */
+    }
+
+.modal-center-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
 
 @keyframes fadeIn {
   from {
