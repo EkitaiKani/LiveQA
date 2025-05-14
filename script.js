@@ -3,7 +3,7 @@ let previousQuestionCount = 0;  // Track previous number of questions
 let refreshInterval;
 let isConnected = false;
 
-const apiKey = 'YOUR-API-KEY'; // Replace this with your real API key
+const apiKey = 'AIzaSyA6wivKowta0v1Eyf56ZsUdIYQXK36_XvY'; // Replace this with your real API key
 
 const connectBtn = document.getElementById('connect-btn');
 const statusEl = document.getElementById('status');
@@ -136,7 +136,7 @@ function processQuestions(rows) {
   
   // Process the current data from the sheet
   const newQuestionsData = rows.slice(1)
-    .filter(row => row[displayIndex] != '') // Only include rows with display value of 1
+  .filter(row => row[displayIndex] && row.every(cell => cell && cell.toString().trim() !== '')) // Only include rows with display value
     .map((row, i) => {
       const question = row[questionIndex] || '';
       const timestamp = row[timestampIndex] || new Date().toISOString();
