@@ -26,7 +26,9 @@ Hi hi hiiii this is my website thingy that shows questions from that Google thin
 
 1. Make a Google Form
    - Ask something like “What’s your question?” and “What’s your name?” or “Name pls” or whatever
+   - Click on the responses tab and then "Link to Sheets"
    - Make a column named "display?" (For moderation purposes). Order your questions by priority through this column
+   - **IMPT** You need to set your sheet to public. Go to Share, and under General Access change the access to Anyone with link
 
 2. Get a Google Sheets robot key thingy:
    - Go here 👉 [Google Cloud Console](https://console.cloud.google.com/)
