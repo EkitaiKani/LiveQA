@@ -12,6 +12,7 @@ Hi hi hiiii this is my website thingy that shows questions from that Google thin
 - 🌟 **questions get like a badge or something** so they look important I guess??
 - 🖱️ **CLICKY QUESTION = BIG POPUP WOW** like BOOM the question EXPLODES (not really) and takes over your screen so you can read it like a nerd.
 - 🕳️ **you wanna close it?** just click somewhere. ANYWHERE. Like bye bye question, go back to the shadow realm
+- 🔥 **MOD SMASH = QUESTION OBLITERATED** some crusty troll drops a stinky question? GONE. YEETED. MODS HIT THE BIG RED NUKE BUTTON 💣💥 and it’s like bye forever loser. No trial. No jury. Just ✨instant vaporization✨.
 
 ## 🧠 How 2 Start
 
@@ -25,6 +26,7 @@ Hi hi hiiii this is my website thingy that shows questions from that Google thin
 
 1. Make a Google Form
    - Ask something like “What’s your question?” and “What’s your name?” or “Name pls” or whatever
+   - Make a column named "display?" (For moderation purposes). Order your questions by priority through this column
 
 2. Get a Google Sheets robot key thingy:
    - Go here 👉 [Google Cloud Console](https://console.cloud.google.com/)
